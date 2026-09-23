@@ -1,7 +1,12 @@
 import React from 'react';
 import { DecisionItem } from '../types/ai';
 
-export const DecisionsTable: React.FC<{ decisions?: DecisionItem[] | null }> = ({ decisions }) => {
+export interface DecisionsTableProps {
+  decisions?: DecisionItem[] | null;
+  onSelectTimestamp?: (timestamp: string) => void;
+}
+
+export const DecisionsTable: React.FC<DecisionsTableProps> = ({ decisions, onSelectTimestamp }) => {
   if (!decisions || decisions.length === 0) {
     return (
       <div className="p-8 text-center bg-white rounded-xl border border-slate-200 text-slate-500">
@@ -42,7 +47,19 @@ export const DecisionsTable: React.FC<{ decisions?: DecisionItem[] | null }> = (
                   )}
                 </td>
                 <td className="px-4 py-3.5 text-slate-500 font-mono text-xs">
-                  {item.evidence_timestamp || '—'}
+                  {item.evidence_timestamp ? (
+                    <button
+                      type="button"
+                      onClick={() => onSelectTimestamp?.(item.evidence_timestamp!)}
+                      className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors cursor-pointer group"
+                      title="Xem trong Transcript"
+                    >
+                      <span>⏱️</span>
+                      <span className="group-hover:underline font-mono">{item.evidence_timestamp}</span>
+                    </button>
+                  ) : (
+                    '—'
+                  )}
                 </td>
               </tr>
             ))}

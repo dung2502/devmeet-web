@@ -29,3 +29,10 @@ export async function deleteMeeting(meetingId: string): Promise<{ success: boole
   });
 }
 
+export async function updateMeetingTitle(meetingId: string, title: string): Promise<MeetingDetail> {
+  return apiClient<MeetingDetail>(`/api/v1/meetings/${meetingId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ title }),
+  });
+}
+

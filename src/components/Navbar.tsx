@@ -28,6 +28,8 @@ export const Navbar: React.FC = () => {
     navigate('/login');
   };
 
+  const isDebugMode = location.search.includes('debug=true') || import.meta.env.DEV;
+
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -133,18 +135,20 @@ export const Navbar: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className="pt-1 border-t border-slate-100">
-                    <button
-                      onClick={() => {
-                        setDropdownOpen(false);
-                        openTokenModal();
-                      }}
-                      className="w-full text-left px-4 py-1.5 text-xs text-slate-400 hover:text-slate-600 flex items-center space-x-1.5"
-                    >
-                      <span>🛠️</span>
-                      <span>Developer Token Override</span>
-                    </button>
-                  </div>
+                  {isDebugMode && (
+                    <div className="pt-1 border-t border-slate-100">
+                      <button
+                        onClick={() => {
+                          setDropdownOpen(false);
+                          openTokenModal();
+                        }}
+                        className="w-full text-left px-4 py-1.5 text-xs text-slate-400 hover:text-slate-600 flex items-center space-x-1.5"
+                      >
+                        <span>🛠️</span>
+                        <span>Developer Token Override</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -156,13 +160,15 @@ export const Navbar: React.FC = () => {
               >
                 Đăng nhập
               </Link>
-              <button
-                onClick={openTokenModal}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg text-xs"
-                title="Developer Token"
-              >
-                🛠️
-              </button>
+              {isDebugMode && (
+                <button
+                  onClick={openTokenModal}
+                  className="p-2 text-slate-400 hover:text-slate-600 rounded-lg text-xs"
+                  title="Developer Token"
+                >
+                  🛠️
+                </button>
+              )}
             </div>
           )}
         </div>

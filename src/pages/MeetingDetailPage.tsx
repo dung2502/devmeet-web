@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getMeeting, deleteMeeting } from '../api/meetings';
+import { getMeeting, deleteMeeting, updateMeetingTitle } from '../api/meetings';
 import { getTranscriptView } from '../api/transcript';
 import { processMeetingAI } from '../api/ai';
 import { MeetingDetail } from '../types/meeting';
@@ -29,6 +29,18 @@ export const MeetingDetailPage: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+
+  // Deep-linking timestamp state
+  const [targetTimestamp, setTargetTimestamp] = useState<string | null>(null);
+
+  // Inline title editing state
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+
+  // More actions dropdown state
+  const [showMoreActions, setShowMoreActions] = useState(false);
+  const moreActionsRef = useRef<HTMLDivElement>(null);
 
   const participantNames = React.useMemo(() => {
     const names = new Set<string>();
@@ -86,6 +98,40 @@ export const MeetingDetailPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Click-outside listener for More Actions dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (moreActionsRef.current && !moreActionsRef.current.contains(event.target as Node)) {
+        setShowMoreActions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSaveTitle = async () => {
+    if (!meetingId || !meeting) return;
+    const cleanTitle = editedTitle.trim();
+    if (!cleanTitle) return;
+    try {
+      setIsSavingTitle(true);
+      const updated = await updateMeetingTitle(meetingId, cleanTitle);
+      setMeeting((prev) => (prev ? { ...prev, title: updated.title || cleanTitle } : prev));
+      setIsEditingTitle(false);
+      setActionMessage({ type: 'success', text: 'Đã đổi tên cuộc họp thành công.' });
+    } catch (err: any) {
+      console.error('Failed to update title:', err);
+      setActionMessage({ type: 'error', text: err.message || 'Không thể đổi tên cuộc họp' });
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
+
+  const handleJumpToTranscript = (timestamp: string) => {
+    setActiveTab('transcript');
+    setTargetTimestamp(timestamp);
+  };
 
   const handleRunAI = async (forceReprocess: boolean = false) => {
     if (!meetingId) return;
@@ -185,10 +231,69 @@ export const MeetingDetailPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-2 min-w-0">
             <div className="flex items-center space-x-3 flex-wrap gap-y-1">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                {meeting?.title || `Cuộc họp ${meeting?.meeting_code || meeting?.id.substring(0, 8)}`}
-              </h1>
-              {meeting?.meeting_code && (
+              {isEditingTitle ? (
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveTitle();
+                      if (e.key === 'Escape') setIsEditingTitle(false);
+                    }}
+                    disabled={isSavingTitle}
+                    autoFocus
+                    className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight bg-white border border-indigo-400 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-sm sm:max-w-md"
+                  />
+                  <button
+                    onClick={handleSaveTitle}
+                    disabled={isSavingTitle}
+                    className="px-2.5 py-1 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                    title="Lưu tên mới"
+                  >
+                    {isSavingTitle ? '⏳' : '✓'}
+                  </button>
+                  <button
+                    onClick={() => setIsEditingTitle(false)}
+                    disabled={isSavingTitle}
+                    className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-700 bg-slate-100 rounded-lg"
+                    title="Hủy"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <h1
+                    className={`text-xl sm:text-2xl font-bold text-slate-900 tracking-tight ${
+                      meeting?.user_role === 'OWNER' ? 'cursor-pointer hover:text-indigo-900' : ''
+                    }`}
+                    onDoubleClick={() => {
+                      if (meeting?.user_role === 'OWNER') {
+                        setEditedTitle(meeting?.title || '');
+                        setIsEditingTitle(true);
+                      }
+                    }}
+                    title={meeting?.user_role === 'OWNER' ? 'Nháy đúp hoặc bấm bút chì để đổi tên' : undefined}
+                  >
+                    {meeting?.title || `Cuộc họp ${meeting?.meeting_code || meeting?.id.substring(0, 8)}`}
+                  </h1>
+                  {meeting?.user_role === 'OWNER' && (
+                    <button
+                      onClick={() => {
+                        setEditedTitle(meeting?.title || '');
+                        setIsEditingTitle(true);
+                      }}
+                      className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                      title="Đổi tên cuộc họp"
+                      aria-label="Đổi tên cuộc họp"
+                    >
+                      ✏️
+                    </button>
+                  )}
+                </div>
+              )}
+              {meeting?.meeting_code && !(meeting?.title && meeting.title.includes(meeting.meeting_code)) && (
                 <span className="font-mono text-xs px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md border border-slate-200 font-semibold">
                   {meeting.meeting_code}
                 </span>
@@ -198,13 +303,13 @@ export const MeetingDetailPage: React.FC = () => {
             {/* Badges row */}
             <div className="flex items-center space-x-2 flex-wrap gap-y-1.5">
               {meeting?.user_role === 'OWNER' ? (
-                <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <span>📝</span>
-                  <span>Tôi thu thập</span>
+                  <span>Tôi chủ trì</span>
                 </span>
               ) : (
                 <span
-                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200"
+                  className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200"
                   title={meeting?.host_name ? `Chủ phòng: ${meeting.host_name}` : 'Cuộc họp tham gia'}
                 >
                   <span>👥</span>
@@ -212,48 +317,30 @@ export const MeetingDetailPage: React.FC = () => {
                 </span>
               )}
               <StatusBadge type="status" value={meeting?.status} />
-              <StatusBadge type="source" value={meeting?.selected_transcript_source} />
-              <StatusBadge type="ai" value={meeting?.ai_status} />
+              <StatusBadge type="ai" value={meeting?.ai_status} compact />
               {meeting?.sheets_sync_status && (
-                <StatusBadge type="sheets" value={meeting?.sheets_sync_status} />
+                <StatusBadge type="sheets" value={meeting?.sheets_sync_status} compact />
               )}
             </div>
           </div>
 
           {/* Action Toolbar */}
-          <div className="flex items-center space-x-2.5 flex-wrap gap-y-2">
-            <ExportDropdown meetingId={meetingId!} />
+          <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+            {meeting?.ai_status !== 'COMPLETED' ? (
+              <button
+                onClick={() => handleRunAI(false)}
+                disabled={isProcessingAI || meeting?.ai_status === 'PROCESSING'}
+                className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all disabled:opacity-60"
+              >
+                <span>{isProcessingAI || meeting?.ai_status === 'PROCESSING' ? '⏳' : '✨'}</span>
+                <span>{isProcessingAI || meeting?.ai_status === 'PROCESSING' ? 'Đang phân tích...' : 'Phân tích AI'}</span>
+              </button>
+            ) : (
+              <ExportDropdown meetingId={meetingId!} />
+            )}
 
-            <button
-              onClick={() => handleRunAI(false)}
-              disabled={isProcessingAI || meeting?.ai_status === 'PROCESSING'}
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all disabled:opacity-60"
-            >
-              <span>{isProcessingAI || meeting?.ai_status === 'PROCESSING' ? '⏳' : '✨'}</span>
-              <span>{isProcessingAI || meeting?.ai_status === 'PROCESSING' ? 'Đang phân tích...' : 'Chạy AI Phân Tích'}</span>
-            </button>
-
-            {meeting?.ai_status === 'COMPLETED' && (
-              meeting?.user_role === 'PARTICIPANT' ? (
-                <button
-                  disabled
-                  title="Kết quả AI đã có. Chỉ chủ phòng mới có thể yêu cầu phân tích lại."
-                  className="inline-flex items-center space-x-1 px-3 py-2 bg-slate-100 text-slate-400 text-xs font-semibold rounded-lg cursor-not-allowed"
-                >
-                  <span>🔄</span>
-                  <span>Chạy lại AI</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleRunAI(true)}
-                  disabled={isProcessingAI}
-                  title="Bỏ qua cache và chạy lại toàn bộ quy trình Gemini AI"
-                  className="inline-flex items-center space-x-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors disabled:opacity-60 cursor-pointer"
-                >
-                  <span>🔄</span>
-                  <span>Chạy lại AI</span>
-                </button>
-              )
+            {meeting?.ai_status !== 'COMPLETED' && (
+              <ExportDropdown meetingId={meetingId!} />
             )}
 
             {meeting?.meeting_url && (
@@ -261,36 +348,89 @@ export const MeetingDetailPage: React.FC = () => {
                 href={meeting.meeting_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center space-x-1 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-medium rounded-lg border border-slate-200 transition-colors"
+                className="inline-flex items-center space-x-1 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 transition-colors shadow-sm"
               >
-                <span>Google Meet ↗</span>
+                <span>Google Meet</span>
+                <span className="text-slate-400">↗</span>
               </a>
             )}
 
-            {meeting?.user_role === 'OWNER' && meeting?.status === 'in_progress' ? (
+            {/* 3-dots More Actions Dropdown */}
+            <div className="relative" ref={moreActionsRef}>
               <button
-                disabled
-                title="Không thể xóa cuộc họp đang diễn ra"
-                className="inline-flex items-center space-x-1.5 px-3 py-2 bg-slate-100 text-slate-400 text-xs font-semibold rounded-lg border border-slate-200 cursor-not-allowed"
+                onClick={() => setShowMoreActions(!showMoreActions)}
+                className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 text-xs font-bold transition-colors flex items-center justify-center w-8 h-8"
+                title="Thêm thao tác"
+                aria-label="Thêm thao tác"
               >
-                <span>🗑️</span>
-                <span>Xóa cuộc họp</span>
+                •••
               </button>
-            ) : (
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                disabled={isDeleting}
-                title={meeting?.user_role === 'PARTICIPANT' ? 'Ẩn cuộc họp khỏi danh sách của bạn' : 'Xóa cuộc họp'}
-                className={`inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold rounded-lg border transition-colors disabled:opacity-60 cursor-pointer ${
-                  meeting?.user_role === 'PARTICIPANT'
-                    ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
-                    : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
-                }`}
-              >
-                <span>{meeting?.user_role === 'PARTICIPANT' ? '👁️' : '🗑️'}</span>
-                <span>{meeting?.user_role === 'PARTICIPANT' ? 'Ẩn cuộc họp' : 'Xóa cuộc họp'}</span>
-              </button>
-            )}
+
+              {showMoreActions && (
+                <div className="absolute right-0 mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-50 text-xs animate-in fade-in duration-100">
+                  {meeting?.ai_status === 'COMPLETED' && (
+                    meeting?.user_role === 'OWNER' ? (
+                      <button
+                        onClick={() => {
+                          setShowMoreActions(false);
+                          handleRunAI(true);
+                        }}
+                        disabled={isProcessingAI}
+                        className="w-full text-left px-3.5 py-2 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 flex items-center space-x-2 transition-colors disabled:opacity-50"
+                      >
+                        <span>🔄</span>
+                        <span>Phân tích lại với Gemini</span>
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        title="Chỉ chủ phòng mới có thể yêu cầu phân tích lại"
+                        className="w-full text-left px-3.5 py-2 text-slate-400 flex items-center space-x-2 cursor-not-allowed"
+                      >
+                        <span>🔄</span>
+                        <span>Phân tích lại (Chỉ chủ trì)</span>
+                      </button>
+                    )
+                  )}
+
+                  {meeting?.google_sheets_url && (
+                    <a
+                      href={meeting.google_sheets_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setShowMoreActions(false)}
+                      className="w-full text-left px-3.5 py-2 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 flex items-center space-x-2 transition-colors"
+                    >
+                      <span>📊</span>
+                      <span>Mở Google Sheets</span>
+                    </a>
+                  )}
+
+                  <div className="border-t border-slate-100 my-1" />
+
+                  {meeting?.user_role === 'OWNER' && meeting?.status === 'in_progress' ? (
+                    <div className="px-3.5 py-1.5 text-slate-400 text-[11px] italic">
+                      Không thể xóa khi đang diễn ra
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        setShowDeleteModal(true);
+                      }}
+                      className={`w-full text-left px-3.5 py-2 flex items-center space-x-2 transition-colors ${
+                        meeting?.user_role === 'PARTICIPANT'
+                          ? 'hover:bg-blue-50 text-blue-700'
+                          : 'hover:bg-rose-50 text-rose-700'
+                      }`}
+                    >
+                      <span>{meeting?.user_role === 'PARTICIPANT' ? '👁️' : '🗑️'}</span>
+                      <span>{meeting?.user_role === 'PARTICIPANT' ? 'Ẩn khỏi danh sách' : 'Xóa cuộc họp'}</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -434,11 +574,26 @@ export const MeetingDetailPage: React.FC = () => {
       {/* Tab Contents */}
       <div>
         {activeTab === 'transcript' && (
-          <TranscriptViewer transcriptView={transcriptView} loading={loadingTranscript} />
+          <TranscriptViewer
+            transcriptView={transcriptView}
+            loading={loadingTranscript}
+            targetTimestamp={targetTimestamp}
+            onClearTargetTimestamp={() => setTargetTimestamp(null)}
+            onDeleteMeeting={
+              meeting?.user_role === 'OWNER' && meeting?.status === 'in_progress'
+                ? undefined
+                : () => setShowDeleteModal(true)
+            }
+            userRole={meeting?.user_role}
+          />
         )}
 
         {activeTab === 'summary' && (
-          <SummaryOverview aiOutput={aiOutput} observability={observability} />
+          <SummaryOverview
+            aiOutput={aiOutput}
+            observability={observability}
+            onSelectTimestamp={handleJumpToTranscript}
+          />
         )}
 
         {activeTab === 'actions_decisions' && (
@@ -448,7 +603,10 @@ export const MeetingDetailPage: React.FC = () => {
                 <span>⚖️</span>
                 <span>Các quyết định đã chốt</span>
               </h3>
-              <DecisionsTable decisions={aiOutput?.decisions} />
+              <DecisionsTable
+                decisions={aiOutput?.decisions}
+                onSelectTimestamp={handleJumpToTranscript}
+              />
             </div>
 
             <div>
@@ -456,7 +614,10 @@ export const MeetingDetailPage: React.FC = () => {
                 <span>✅</span>
                 <span>Nhiệm vụ & Việc cần làm (Action Items)</span>
               </h3>
-              <ActionItemsTable actionItems={aiOutput?.action_items} />
+              <ActionItemsTable
+                actionItems={aiOutput?.action_items}
+                onSelectTimestamp={handleJumpToTranscript}
+              />
             </div>
           </div>
         )}
@@ -469,6 +630,7 @@ export const MeetingDetailPage: React.FC = () => {
           <GoogleSheetsView
             sheetsUrl={meeting?.google_sheets_url}
             syncStatus={meeting?.sheets_sync_status}
+            onRetrySync={meeting?.user_role === 'OWNER' ? () => handleRunAI(true) : undefined}
           />
         )}
       </div>

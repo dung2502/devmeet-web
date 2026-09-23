@@ -40,7 +40,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({ meeting, onDelete }) =
             <h3 className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate text-base">
               {meeting.title || `Cuộc họp ${meeting.meeting_code || meeting.id.substring(0, 8)}`}
             </h3>
-            {meeting.meeting_code && (
+            {meeting.meeting_code && !(meeting.title && meeting.title.includes(meeting.meeting_code)) && (
               <span className="font-mono text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200">
                 {meeting.meeting_code}
               </span>
@@ -76,7 +76,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({ meeting, onDelete }) =
           {meeting.user_role === 'OWNER' ? (
             <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
               <span>📝</span>
-              <span>Tôi thu thập</span>
+              <span>Tôi chủ trì</span>
             </span>
           ) : (
             <span
@@ -89,12 +89,9 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({ meeting, onDelete }) =
           )}
 
           <StatusBadge type="status" value={meeting.status} />
-          {meeting.selected_transcript_source && (
-            <StatusBadge type="source" value={meeting.selected_transcript_source} />
-          )}
-          <StatusBadge type="ai" value={meeting.ai_status} />
+          <StatusBadge type="ai" value={meeting.ai_status} compact />
           {meeting.sheets_sync_status === 'COMPLETED' && (
-            <StatusBadge type="sheets" value={meeting.sheets_sync_status} />
+            <StatusBadge type="sheets" value={meeting.sheets_sync_status} compact />
           )}
           {onDelete && (
             meeting.user_role === 'OWNER' && meeting.status === 'in_progress' ? (
