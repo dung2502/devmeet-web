@@ -293,6 +293,15 @@ export const MeetingDetailPage: React.FC = () => {
                   )}
                 </div>
               )}
+              {meeting?.platform === 'ZOOM_WEB' || meeting?.meeting_url?.includes('zoom.us') ? (
+                <span className="font-sans text-xs px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md border border-blue-200 font-semibold inline-flex items-center gap-1">
+                  <span>🟦</span> Zoom
+                </span>
+              ) : (
+                <span className="font-sans text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-200 font-semibold inline-flex items-center gap-1">
+                  <span>📹</span> Google Meet
+                </span>
+              )}
               {meeting?.meeting_code && !(meeting?.title && meeting.title.includes(meeting.meeting_code)) && (
                 <span className="font-mono text-xs px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md border border-slate-200 font-semibold">
                   {meeting.meeting_code}

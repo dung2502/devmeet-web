@@ -40,6 +40,15 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({ meeting, onDelete }) =
             <h3 className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate text-base">
               {meeting.title || `Cuộc họp ${meeting.meeting_code || meeting.id.substring(0, 8)}`}
             </h3>
+            {meeting.platform === 'ZOOM_WEB' || meeting.meeting_url?.includes('zoom.us') ? (
+              <span className="font-sans text-[11px] px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200 font-semibold inline-flex items-center gap-1">
+                <span>🟦</span> Zoom
+              </span>
+            ) : (
+              <span className="font-sans text-[11px] px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-200 font-semibold inline-flex items-center gap-1">
+                <span>📹</span> Meet
+              </span>
+            )}
             {meeting.meeting_code && !(meeting.title && meeting.title.includes(meeting.meeting_code)) && (
               <span className="font-mono text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200">
                 {meeting.meeting_code}

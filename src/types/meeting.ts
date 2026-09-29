@@ -28,6 +28,7 @@ export interface MeetingListItem {
   participant_count: number;
   user_role?: 'OWNER' | 'PARTICIPANT' | string;
   host_name?: string | null;
+  platform?: 'GOOGLE_MEET' | 'ZOOM_WEB' | string;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +64,7 @@ export interface MeetingDetail {
   participants: Participant[];
   user_role?: 'OWNER' | 'PARTICIPANT' | string;
   host_name?: string | null;
+  platform?: 'GOOGLE_MEET' | 'ZOOM_WEB' | string;
   created_at: string;
   updated_at: string;
 }
